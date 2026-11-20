@@ -1,0 +1,142 @@
+# main.py
+from pathlib import Path
+import csv
+import re
+ 
+class InvalidRegistration(Exception):
+    """A registration line does not follow the required format."""
+ 
+def valid_email(email):
+    if " " in email or email.count("@") != 1:
+        return False
+    local, domain = email.split("@")
+    return bool(local and domain and "." in domain and
+                not domain.startswith(".") and
+                not domain.endswith("."))
+ 
+def parse_line(line):
+    fields = [part.strip() for part in line.strip().split(";")]
+    if len(fields) != 5:
+        raise InvalidRegistration(
+            f"expected 5 fields, found {len(fields)}"
+        )
+ 
+    reg_no, name, department, email, event_text = fields
+ 
+    if not reg_no or not name or not department:
+        raise InvalidRegistration("register number, name and department are required")
+    if not valid_email(email):
+        raise InvalidRegistration(f"invalid e-mail: {email!r}")
+ 
+    events = [event.strip() for event in event_text.split(",")
+              if event.strip()]
+    if not events:
+        raise InvalidRegistration("at least one event is required")
+ 
+    return {
+        "register_number": reg_no,
+        "name": name,
+        "department": department,
+        "email": email,
+        "events": events
+    }
+ 
+def process_files(input_files):
+    seen = set()
+    master = []
+    event_groups = {}
+    errors = []
+ 
+    for path in input_files:
+        try:
+            with path.open("r", encoding="utf-8") as file:
+                for line_no, line in enumerate(file, start=1):
+                    if not line.strip():
+                        continue
+                    try:
+                        record = parse_line(line)
+                        reg_no = record["register_number"]
+ 
+                        if reg_no in seen:
+                            raise InvalidRegistration(
+                                f"duplicate register number: {reg_no}"
+                            )
+ 
+                        # Mark as seen only after the record is valid.
+                        seen.add(reg_no)
+                        master.append(record)
+ 
+                        for event in record["events"]:
+                            event_groups.setdefault(event, []).append(record)
+ 
+                    except InvalidRegistration as exc:
+                        errors.append(
+                            f"{path.name}:{line_no}: {exc}"
+                        )
+ 
+        except FileNotFoundError:
+            errors.append(f"{path.name}:0: file not found")
+        except PermissionError:
+            errors.append(f"{path.name}:0: permission denied")
+        except UnicodeDecodeError:
+            errors.append(f"{path.name}:0: invalid UTF-8 encoding")
+        except OSError as exc:
+            errors.append(f"{path.name}:0: I/O error: {exc}")
+ 
+    return master, event_groups, errors
+ 
+def safe_filename(name):
+    # Replace characters that are unsuitable in a filename.
+    cleaned = re.sub(r"[^A-Za-z0-9_-]+", "_", name).strip("_")
+    return cleaned or "unnamed_event"
+ 
+def write_outputs(master, event_groups, errors, output_folder):
+    output_folder.mkdir(parents=True, exist_ok=True)
+    columns = ["register_number", "name", "department", "email", "events"]
+ 
+    master_path = output_folder / "master.csv"
+    with master_path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=columns)
+        writer.writeheader()
+        for record in master:
+            row = dict(record)
+            row["events"] = ", ".join(record["events"])
+            writer.writerow(row)
+ 
+    for event, participants in event_groups.items():
+        event_path = output_folder / (
+            "event_" + safe_filename(event) + ".csv"
+        )
+        with event_path.open("w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=columns)
+            writer.writeheader()
+            for record in participants:
+                row = dict(record)
+                row["events"] = ", ".join(record["events"])
+                writer.writerow(row)
+ 
+    summary_path = output_folder / "summary.txt"
+    with summary_path.open("w", encoding="utf-8") as file:
+        file.write(f"Unique valid registrations: {len(master)}\\n")
+        file.write(f"Number of events: {len(event_groups)}\\n")
+        for event, participants in sorted(event_groups.items()):
+            file.write(f"{event}: {len(participants)} participants\\n")
+        file.write(f"Rejected lines/files: {len(errors)}\\n")
+ 
+    error_path = output_folder / "errors.log"
+    with error_path.open("w", encoding="utf-8") as file:
+        if errors:
+            file.write("\\n".join(errors) + "\\n")
+        else:
+            file.write("No errors.\\n")
+ 
+def main():
+    input_folder = Path("input")
+    output_folder = Path("output")
+ 
+    # Expected five department files. A missing file is logged by process_files.
+    department_names = ["CSE", "ECE", "EEE", "MECH", "CIVIL"]
+    input_files = [input_folder / f"{name}.txt"
+                   for name in department_names]
+ 
+    master, event_groups, errors = process_files(input_files)
