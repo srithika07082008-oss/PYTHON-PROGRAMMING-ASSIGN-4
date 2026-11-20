@@ -1,0 +1,34 @@
+START
+    create empty dictionary totals
+    create empty list damaged_records
+ 
+    obtain all daily attendance files using Path.glob("*.csv")
+    sort the file list by filename
+ 
+    FOR each filename in the file list
+        TRY to open filename as UTF-8 text
+            FOR each line and line_number in the file
+                IF line is blank: continue
+                split line by comma and trim each field
+                IF field count is not 3:
+                    add (filename, line_number, "wrong field count") to errors
+                    continue
+                validate register number, date and status
+                IF status is not P or A:
+                    add damaged record to errors
+                    continue
+                create dictionary entry for register number if absent
+                IF status is P: increase present count
+                ELSE: increase absent count
+        CATCH missing file / permission / decoding error
+            record file-level error and continue to next file
+ 
+    FOR each student in totals
+        total_days = present + absent
+        percentage = present / total_days * 100
+        write one row to attendance_summary.csv
+        IF percentage < 75:
+            write student to below_75_percent.csv
+ 
+    write damaged_records to attendance_errors.csv
+END
