@@ -1,0 +1,62 @@
+def total_mess_bills(filename):
+    total = Decimal("0.00")
+    accepted_report = []
+    rejected_lines = []
+ 
+    try:
+        with open(filename, "r", encoding="utf-8") as file:
+            for line_number, line in enumerate(file, start=1):
+                line = line.strip()
+ 
+                # Ignore blank lines, including a final empty line.
+                if not line:
+                    continue
+ 
+                try:
+                    parts = [item.strip() for item in line.split(",")]
+                    if len(parts) != 3:
+                        raise ValueError(
+                            f"expected 3 fields, found {len(parts)}"
+                        )
+ 
+                    register_no, name, amount_text = parts
+                    if not register_no or not name:
+                        raise ValueError("register number/name is empty")
+ 
+                    amount = Decimal(amount_text)
+                    if not amount.is_finite() or amount < 0:
+                        raise ValueError("amount must be a non-negative number")
+ 
+                    total += amount
+                    accepted_report.append(
+                        f"{register_no} - {name} - Rs. {amount:.2f}"
+                    )
+ 
+                except (ValueError, InvalidOperation) as error:
+                    rejected_lines.append((line_number, line, str(error)))
+ 
+    except FileNotFoundError:
+        print(f"Error: file not found: {filename}")
+        return
+    except PermissionError:
+        print(f"Error: permission denied: {filename}")
+        return
+    except UnicodeDecodeError:
+        print(f"Error: {filename} is not valid UTF-8 text")
+        return
+ 
+    print("ACCEPTED MESS BILL RECORDS")
+    for record in accepted_report:
+        print(record)
+ 
+    print(f"Total amount: Rs. {total:.2f}")
+ 
+    print("\nREJECTED RECORDS")
+    if not rejected_lines:
+        print("No rejected records.")
+    else:
+        for number, line, reason in rejected_lines:
+            print(f"Line {number}: {line!r} -> {reason}")
+ 
+if __name__ == "__main__":
+    total_mess_bills("mess_oct.txt")
