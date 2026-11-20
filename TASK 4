@@ -1,0 +1,38 @@
+from pathlib import Path
+import logging
+ 
+logging.basicConfig(
+    filename="returns_errors.log",
+    level=logging.ERROR,
+    format="%(asctime)s %(levelname)s %(message)s"
+)
+ 
+def save_returns(books, log_path="returns.log"):
+    # Append mode preserves earlier days; newline separates book IDs.
+    with open(log_path, "a", encoding="utf-8") as log:
+        for book in books:
+            log.write(str(book).strip() + "\\n")
+ 
+def process(day_file, log_path="returns.log"):
+    try:
+        with open(day_file, "r", encoding="utf-8") as source:
+            books = [line.strip() for line in source if line.strip()]
+        save_returns(books, log_path)
+        print(f"Processed {day_file}: {len(books)} returned books")
+ 
+    except FileNotFoundError:
+        logging.exception("Daily return file not found: %s", day_file)
+        print(f"Missing input file: {day_file}")
+    except PermissionError:
+        logging.exception("Permission denied while processing: %s", day_file)
+        print(f"Permission denied: {day_file}")
+    except UnicodeDecodeError:
+        logging.exception("Invalid encoding in: %s", day_file)
+        print(f"Invalid text encoding: {day_file}")
+    except OSError:
+        logging.exception("I/O failure while processing: %s", day_file)
+        print(f"I/O error while processing: {day_file}")
+ 
+if __name__ == "__main__":
+    for day in ["day1.txt", "day2.txt", "day3.txt"]:
+        process(day)
