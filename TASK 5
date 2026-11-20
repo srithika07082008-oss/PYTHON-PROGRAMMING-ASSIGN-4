@@ -1,0 +1,20 @@
+# single_script.py
+def read_records(path):
+    records = []
+    with open(path, encoding="utf-8") as file:
+        for line in file:
+            if line.strip():
+                records.append(line.strip().split(","))
+    return records
+ 
+def calculate_percentage(present, total):
+    return 0 if total == 0 else present / total * 100
+ 
+def write_report(path, rows):
+    with open(path, "w", encoding="utf-8") as file:
+        for row in rows:
+            file.write(",".join(map(str, row)) + "\\n")
+ 
+if __name__ == "__main__":
+    data = read_records("attendance.csv")
+    print("Records:", len(data))
